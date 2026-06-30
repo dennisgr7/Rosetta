@@ -88,11 +88,18 @@ jobs:
         run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --workspace -- -D warnings
-      # Smoke de carga de ONNX Runtime por load-dynamic (no necesita modelos):
-      # `doctor` carga la dylib y enumera la cascada de EPs en cada SO.
-      # cobertura-4: ahora también en Windows (la dylib x64 se asegura arriba).
+      # Smoke de carga de ONNX Runtime por load-dynamic (no necesita modelos).
+      # En un runner Windows headless el probe de DirectML del `doctor` (auto) se
+      # cuelga (no hay GPU/D3D), así que ahí el smoke usa --device cpu; en
+      # Linux/macOS el `doctor` (auto) prueba OpenVINO/CoreML y carga la dylib.
       - name: Smoke (carga ONNX Runtime)
-        run: cargo run -p rosetta-cli -- doctor
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cargo run -p rosetta-cli -- doctor --device cpu
+          else
+            cargo run -p rosetta-cli -- doctor
+          fi
 
   no-c:
     name: regla sin-C (build de Windows)
