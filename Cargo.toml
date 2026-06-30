@@ -58,8 +58,8 @@ strip = true
 # Empaquetado y distribución con `dist` (cargo-dist). Genera instaladores
 # multiplataforma (shell/powershell/npm/homebrew) + auto-update desde un tag `v*`.
 # El workflow vive en `.github/workflows/release.yml` (regenerable con `dist generate`).
-# PENDIENTE antes de la primera release: la dylib de ONNX Runtime debe viajar JUNTO al
-# binario (load-dynamic la resuelve ahí); ver RELEASING.md.
+# La dylib de ONNX Runtime NO viaja en el archivo: el binario la descarga (verificada por
+# sha256) en el primer uso si falta (ver `ensure_ort_runtime`). Detalles en RELEASING.md.
 [workspace.metadata.dist]
 cargo-dist-version = "0.32.0"
 ci = "github"

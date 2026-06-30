@@ -22,20 +22,14 @@ To regenerate the workflow after changing the dist config: `dist init` / `dist g
 
 ## ⚠️ TODO before the first real release — ONNX Runtime sidecar
 
-The binary loads ONNX Runtime dynamically (`load-dynamic`); `ensure_ort_dylib()` resolves the
-shared library next to the executable. The generated `release.yml` builds the binary but does
-**not yet ship the onnxruntime shared library** alongside it, so an installed binary would not
-find a runtime out of the box.
+The binary loads ONNX Runtime dynamically (`load-dynamic`). On first run, if it can't find the
+shared library (next to the executable, in `runtime/<platform>/`, or via `ORT_DYLIB_PATH`), it
+**downloads the official build for the current platform** — sha256-verified — into the model cache,
+the same on-demand mechanism used for models (`rosetta_models::ensure_ort_runtime`). So a
+`dist`-installed binary works out of the box; **no dylib sidecar is bundled in the release archive.**
 
-Pick one before tagging:
+Covered targets: Windows x64/arm64, Linux x64/arm64, macOS arm64. **Exception:** macOS x86_64 (Intel)
+has no official ONNX Runtime release for v1.24.4 — set `ORT_DYLIB_PATH` manually there.
 
-- **Bundle the dylib (recommended).** Add a step to the `build-local-artifacts` job that, per
-  target, downloads the matching `onnxruntime` shared library (Windows DirectML wheel / Linux /
-  macOS tarball — same URLs and SHA-256 verification as `ci.yml`) into the staging directory, and
-  reference it from `include = [...]` in `[workspace.metadata.dist]`. Then set `allow-dirty = ["ci"]`
-  so `dist generate` keeps the manual step. This needs one real tag run to validate.
-- **Fetch at runtime.** Alternatively, extend `ensure_ort_dylib()` to download the matching dylib
-  on first run if missing (like models are fetched), and cache it next to the binary or in the
-  model cache. Keeps releases trivial; it is a runtime download of a prebuilt library (no C compiled).
-
-Until this is done, install from source or use the Docker image (which bundles the dylib).
+(The downloaded runtime is the CPU build, which is the sensible default everywhere — on Snapdragon
+DirectML is slower than CPU anyway. For a discrete GPU, provide a GPU-enabled dylib via `ORT_DYLIB_PATH`.)

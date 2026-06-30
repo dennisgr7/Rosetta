@@ -790,7 +790,29 @@ fn ensure_ort_dylib() {
             }
         }
     }
-    tracing::warn!("no se encontró {ORT_DYLIB}; define ORT_DYLIB_PATH si la inferencia falla");
+    // No está junto al binario: como último recurso, descarga el build oficial de
+    // ONNX Runtime a la caché (verificado por sha256; es una librería precompilada,
+    // no compila C). Así un binario instalado (p. ej. vía los instaladores de `dist`)
+    // funciona sin que el usuario tenga que aportar la dylib.
+    match rosetta_models::ensure_ort_runtime() {
+        Ok(dylib) => {
+            // SAFETY: al inicio del manejo del comando, antes de usar ort y sin
+            // otros hilos tocando el entorno.
+            unsafe {
+                std::env::set_var("ORT_DYLIB_PATH", &dylib);
+            }
+            if let Some(parent) = dylib.parent() {
+                prepend_to_loader_path(parent);
+            }
+            tracing::debug!(dylib = %dylib.display(), "ONNX Runtime resuelto desde la caché");
+        }
+        Err(e) => {
+            tracing::warn!(
+                "no se encontró {ORT_DYLIB} ni se pudo descargar ONNX Runtime ({e}); \
+                 define ORT_DYLIB_PATH si la inferencia falla"
+            );
+        }
+    }
 }
 
 /// Antepone `dir` a la variable que usa el loader dinámico de cada SO para

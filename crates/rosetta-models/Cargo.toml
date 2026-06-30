@@ -24,6 +24,11 @@ ureq = { version = "3.3.0", default-features = false, features = ["gzip"] }
 # la regla no aplica).
 [target.'cfg(windows)'.dependencies]
 ureq = { version = "3.3.0", default-features = false, features = ["native-tls"] }
+# Los builds de ONNX Runtime para Windows se distribuyen en .zip. `deflate` usa
+# flate2/miniz_oxide (Rust puro) — sin C, respeta la regla de la build de Windows.
+zip = { version = "5", default-features = false, features = ["deflate"] }
 
 [target.'cfg(not(windows))'.dependencies]
 ureq = { version = "3.3.0", default-features = false, features = ["rustls"] }
+# Los builds de ONNX Runtime para Linux/macOS son .tar.gz. flate2 (miniz_oxide) es Rust puro.
+flate2 = "1"

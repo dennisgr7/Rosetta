@@ -308,6 +308,204 @@ pub fn clean() -> Result<(PathBuf, u64)> {
     Ok((root, freed))
 }
 
+// ─── ONNX Runtime: descarga de la librería precompilada ──────────────────────
+// Es una dylib OFICIAL verificada por sha256 (no compila C), análoga a la descarga
+// de modelos. El CLI la usa como último recurso cuando no la encuentra junto al
+// binario. La verificación sha256 la hace MÁS segura que cargar una dylib local sin
+// verificar (cf. seguridad-1).
+
+/// Versión de ONNX Runtime que distribuye el proyecto (techo in-process de `ort`
+/// con `api-24`).
+pub const ORT_VERSION: &str = "1.24.4";
+
+/// Nombre de la librería compartida de ONNX Runtime por plataforma.
+#[cfg(windows)]
+const ORT_DYLIB_NAME: &str = "onnxruntime.dll";
+#[cfg(target_os = "linux")]
+const ORT_DYLIB_NAME: &str = "libonnxruntime.so";
+#[cfg(target_os = "macos")]
+const ORT_DYLIB_NAME: &str = "libonnxruntime.dylib";
+
+struct OrtAsset {
+    url: String,
+    sha256: &'static str,
+}
+
+/// Asset oficial de ONNX Runtime 1.24.4 para la plataforma actual, o `None` si no
+/// hay build oficial publicado (p. ej. macOS x86_64: aporta `ORT_DYLIB_PATH`).
+fn ort_asset() -> Option<OrtAsset> {
+    let base = "https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/";
+    let (file, sha256): (&str, &str) = if cfg!(all(target_os = "windows", target_arch = "aarch64"))
+    {
+        (
+            "onnxruntime-win-arm64-1.24.4.zip",
+            "47dc80aa39da792271af10be5993919536a4dab0965ec1e6043ef37f1df7a693",
+        )
+    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+        (
+            "onnxruntime-win-x64-1.24.4.zip",
+            "d2319fddfb6ea4db99ccc4b60c85c517bcd855721f5daa6a06d40d7cb2ee2357",
+        )
+    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        (
+            "onnxruntime-linux-x64-1.24.4.tgz",
+            "3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747",
+        )
+    } else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+        (
+            "onnxruntime-linux-aarch64-1.24.4.tgz",
+            "866109a9248d057671a039b9d725be4bd86888e3754140e6701ec621be9d4d7e",
+        )
+    } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        (
+            "onnxruntime-osx-arm64-1.24.4.tgz",
+            "93787795f47e1eee369182e43ed51b9e5da0878ab0346aecf4258979b8bba989",
+        )
+    } else {
+        return None;
+    };
+    Some(OrtAsset {
+        url: format!("{base}{file}"),
+        sha256,
+    })
+}
+
+/// Asegura la librería de ONNX Runtime en la caché del usuario: si falta, descarga
+/// el build OFICIAL (verificando sha256) y extrae la dylib; devuelve su ruta. No
+/// compila C: es una librería precompilada, como los modelos.
+pub fn ensure_ort_runtime() -> Result<PathBuf> {
+    let dir = cache_root().join(".ort-runtime").join(ORT_VERSION);
+    let dylib = dir.join(ORT_DYLIB_NAME);
+    if dylib.exists() {
+        return Ok(dylib);
+    }
+    let Some(asset) = ort_asset() else {
+        return Err(ModelError::Catalog(format!(
+            "no hay build oficial de ONNX Runtime {ORT_VERSION} para esta plataforma; \
+             define ORT_DYLIB_PATH con la ruta a la librería"
+        )));
+    };
+    fs::create_dir_all(&dir).map_err(|e| io_err(&dir, e))?;
+    eprintln!(
+        "ONNX Runtime no encontrado; descargando el build oficial {ORT_VERSION} a la caché (solo la primera vez)…"
+    );
+    // OJO: el nombre NO debe acabar en `.part` (http_get_to usa internamente
+    // `<dest>.part` y su guard lo borraría tras el rename).
+    let tmp = dir.join("ort-runtime-download");
+    let _guard = PartGuard(&tmp);
+    http_get_to(&asset.url, &tmp)?;
+    let got = sha256_file(&tmp)?;
+    if got != asset.sha256 {
+        return Err(ModelError::Catalog(format!(
+            "el sha256 de ONNX Runtime no coincide (esperado {}, obtenido {got})",
+            asset.sha256
+        )));
+    }
+    #[cfg(windows)]
+    extract_ort_zip(&tmp, &dir)?;
+    #[cfg(not(windows))]
+    extract_ort_tgz(&tmp, &dir)?;
+    if !dylib.exists() {
+        return Err(ModelError::Catalog(format!(
+            "la librería {ORT_DYLIB_NAME} no apareció tras extraer ONNX Runtime"
+        )));
+    }
+    Ok(dylib)
+}
+
+/// Extrae de un `.zip` de ONNX Runtime (Windows) las DLLs bajo `*/lib/` de forma
+/// plana en `dir`.
+#[cfg(windows)]
+fn extract_ort_zip(archive: &Path, dir: &Path) -> Result<()> {
+    use std::io::Read;
+    let f = fs::File::open(archive).map_err(|e| io_err(archive, e))?;
+    let mut zip = zip::ZipArchive::new(f)
+        .map_err(|e| ModelError::Archive(format!("zip ONNX Runtime: {e}")))?;
+    for i in 0..zip.len() {
+        let mut file = zip
+            .by_index(i)
+            .map_err(|e| ModelError::Archive(format!("zip ONNX Runtime: {e}")))?;
+        let Some(name) = file.enclosed_name() else {
+            continue;
+        };
+        let in_lib = name.components().any(|c| c.as_os_str() == "lib");
+        let fname = name
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+        if in_lib && fname.ends_with(".dll") {
+            let dest = dir.join(&fname);
+            let mut limited = (&mut file).take(MAX_FILE_BYTES + 1);
+            let mut out = fs::File::create(&dest).map_err(|e| io_err(&dest, e))?;
+            let copied = std::io::copy(&mut limited, &mut out).map_err(|e| io_err(&dest, e))?;
+            if copied > MAX_FILE_BYTES {
+                return Err(ModelError::TooLarge {
+                    what: fname,
+                    limit: MAX_FILE_BYTES,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Extrae de un `.tar.gz` de ONNX Runtime (Linux/macOS) las librerías bajo `*/lib/`
+/// de forma plana en `dir`, y recrea el nombre canónico (los `.so`/`.dylib`
+/// versionados vienen como symlink en el tar).
+#[cfg(not(windows))]
+fn extract_ort_tgz(archive: &Path, dir: &Path) -> Result<()> {
+    use std::io::Read;
+    let f = fs::File::open(archive).map_err(|e| io_err(archive, e))?;
+    let gz = flate2::read::GzDecoder::new(f);
+    let mut tar = tar::Archive::new(gz);
+    for entry in tar.entries().map_err(|e| io_err(archive, e))? {
+        let mut entry = entry.map_err(|e| io_err(archive, e))?;
+        if !entry.header().entry_type().is_file() {
+            continue; // los symlinks de versión se recrean por copia abajo
+        }
+        let path = entry.path().map_err(|e| io_err(archive, e))?.into_owned();
+        let in_lib = path.components().any(|c| c.as_os_str() == "lib");
+        let fname = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+        let is_lib =
+            fname.contains("onnxruntime") && (fname.contains(".so") || fname.contains(".dylib"));
+        if in_lib && is_lib {
+            let dest = dir.join(&fname);
+            let mut limited = entry.by_ref().take(MAX_FILE_BYTES + 1);
+            let mut out = fs::File::create(&dest).map_err(|e| io_err(&dest, e))?;
+            let copied = std::io::copy(&mut limited, &mut out).map_err(|e| io_err(&dest, e))?;
+            if copied > MAX_FILE_BYTES {
+                return Err(ModelError::TooLarge {
+                    what: fname,
+                    limit: MAX_FILE_BYTES,
+                });
+            }
+        }
+    }
+    // Nombre canónico (libonnxruntime.so / .dylib): copia el archivo real versionado.
+    let canon = dir.join(ORT_DYLIB_NAME);
+    if !canon.exists()
+        && let Ok(rd) = fs::read_dir(dir)
+    {
+        for e in rd.flatten() {
+            let n = e.file_name();
+            let n = n.to_string_lossy();
+            let is_main = n.starts_with("libonnxruntime")
+                && !n.contains("providers")
+                && (n.contains(".so") || n.contains(".dylib"));
+            if is_main {
+                fs::copy(e.path(), &canon).map_err(|er| io_err(&canon, er))?;
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
 fn download_file(f: &ModelFile, dest: &Path) -> Result<()> {
     if let Some(url) = &f.url {
         http_get_to(url, dest)

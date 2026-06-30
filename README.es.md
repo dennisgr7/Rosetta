@@ -47,6 +47,9 @@ docker run --rm -v rosetta-models:/models -v "$PWD:/audio" ghcr.io/dennisgr7/ros
 
 O compila desde el código fuente (ver [Compilar](#compilar-desde-el-código-fuente)).
 
+> En el **primer uso** se descargan, bajo demanda, el ONNX Runtime de tu plataforma y el modelo que
+> uses (ambos verificados por sha256, en la caché de `rosetta models path`). Las siguientes corridas son offline.
+
 ## Uso rápido
 
 ```sh
@@ -122,9 +125,11 @@ volumen en `/models` para que los modelos persistan entre ejecuciones.
 
 ## Compilar desde el código fuente
 
-Requiere Rust ≥ 1.88. Rosetta carga ONNX Runtime de forma dinámica (`load-dynamic`): tú aportas la
-librería compartida aparte y apuntas `ORT_DYLIB_PATH` a ella (la CLI también busca junto al binario y
-en `runtime/<plataforma>/`). En Windows esto mantiene el build **sin C**.
+Requiere Rust ≥ 1.88. Rosetta carga ONNX Runtime de forma dinámica (`load-dynamic`); **en el primer
+uso descarga el runtime oficial de tu plataforma** (verificado por sha256) a la caché si no está ya
+disponible — no tienes que aportarlo. Puedes forzar con `ORT_DYLIB_PATH` o dejar la librería en
+`runtime/<plataforma>/`. En Windows esto mantiene el build **sin C**. (macOS x86_64/Intel no tiene
+build oficial; ahí define `ORT_DYLIB_PATH`.)
 
 ```sh
 git clone https://github.com/dennisgr7/Rosetta && cd Rosetta
