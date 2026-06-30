@@ -56,10 +56,10 @@ codegen-units = 1
 strip = true
 
 # Empaquetado y distribución con `dist` (cargo-dist). Genera instaladores
-# multiplataforma + auto-update desde un tag `v*`. La dylib de ONNX Runtime viaja
-# como sidecar JUNTO al binario (load-dynamic la resuelve ahí); el workflow de
-# release la descarga por target. `allow-dirty = ["ci"]` permite añadir a mano el
-# paso de descarga de la dylib en el release.yml generado.
+# multiplataforma (shell/powershell/npm/homebrew) + auto-update desde un tag `v*`.
+# El workflow vive en `.github/workflows/release.yml` (regenerable con `dist generate`).
+# PENDIENTE antes de la primera release: la dylib de ONNX Runtime debe viajar JUNTO al
+# binario (load-dynamic la resuelve ahí); ver RELEASING.md.
 [workspace.metadata.dist]
 cargo-dist-version = "0.32.0"
 ci = "github"
@@ -73,7 +73,9 @@ targets = [
     "aarch64-pc-windows-msvc",
 ]
 install-updater = true
-allow-dirty = ["ci"]
+# Dónde colocan el binario los instaladores (junto a la dylib de ONNX Runtime, que
+# `ensure_ort_dylib` resuelve al lado del ejecutable).
+install-path = "CARGO_HOME"
 
 # Perfil que `dist` usa para los binarios del release (release + máx. optimización).
 [profile.dist]
