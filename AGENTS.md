@@ -48,8 +48,8 @@ correctos). Comentarios y mensajes de commit en español.
    `cargo tree --target …`) y el parser de placement es `rosetta doctor --profile <dir>` (en
    `rosetta-cli`, con `serde_json`); ambos sustituyen a los antiguos scripts. No reintroducir
    lógica en otros lenguajes.
-7. **Proyecto agnóstico de dispositivo.** Rosetta NO está atado a ningún equipo concreto (ni a la
-   Raspberry Pi ni al Snapdragon del dueño): debe funcionar y optimizarse **al 100%, de forma
+7. **Proyecto agnóstico de dispositivo.** Rosetta NO está atado a ningún equipo
+   concreto: debe funcionar y optimizarse **al 100%, de forma
    nativa y limpia, en cualquier Windows/Windows-ARM, Linux/Linux-ARM y macOS**, con el acelerador
    disponible en cada host (NVIDIA/AMD discretas, iGPU, NPU o CPU). **Toda decisión de arquitectura
    que optimice para un dispositivo a costa de otro es un bug, no una feature.** Los "bancos de
@@ -135,18 +135,15 @@ Recoger telemetría cruzada entre hosts con `--trace` (JSONL `RunMetrics`, esque
 instrumentación por etapa. Diff de los JSONL entre hosts caza caídas silenciosas a CPU y
 divergencias int8 GPU/CPU.
 
-- **Snapdragon X (nativo, "AsusBookDennis")** — Windows ARM64, CPU + DirectML(GPU Adreno).
-  Exportar `ROSETTA_MODELS_DIR=…\Rosetta\models` (el cwd suele ser `…\dev`, no el repo) y usar
-  la dll DirectML.
-- **Raspberry Pi 5 (SSH host `pi`, "dennispi")** — aarch64 Debian, 4 cores/15Gi, CPU-only.
-  Build nativo en `~/rosetta`. Ejecutar con
-  `ORT_DYLIB_PATH=$HOME/rosetta/runtime/linux-aarch64/libonnxruntime.so` (1.24.4) y
-  `ROSETTA_MODELS_DIR=$HOME/rosetta/models`. Sin ffmpeg (symphonia cubre wav).
-- **Docker Desktop (x86 Linux CPU)** — en este host ARM64 es emulación QEMU lenta para x86;
-  el mismo código Linux ya lo cubre el CI.
+- **Windows ARM64 (clase Snapdragon X)** — CPU + DirectML(GPU). Exportar `ROSETTA_MODELS_DIR`
+  al directorio de modelos y apuntar a la dll DirectML (`runtime/win-arm64-dml/`).
+- **Raspberry Pi 5 / Linux aarch64 (por SSH)** — CPU-only. Ejecutar con
+  `ORT_DYLIB_PATH=…/runtime/linux-aarch64/libonnxruntime.so` (1.24.4) y `ROSETTA_MODELS_DIR=…`.
+  Útil para cazar divergencias int8 entre hosts. (symphonia cubre WAV sin ffmpeg).
+- **Docker x86 Linux CPU** — el mismo código Linux ya lo cubre el CI.
 
-Fixtures: `tests/fixtures/{es_prueba,es_largo,es_2voces}.wav` (los 2 últimos generados con
-`scratchpad/gen_*.py`, gitignored).
+Fixtures: `tests/fixtures/{es_prueba,es_largo,es_2voces}.wav` (gitignored; los 2 últimos
+sintéticos). Generadores y bancos de prueba son medios de validación, no parte del repo público.
 
 ### Patrones HW medidos (clave)
 - **DirectML es 2–10× MÁS LENTO que CPU para int8 pequeño en Snapdragon** (Parakeet es_prueba
