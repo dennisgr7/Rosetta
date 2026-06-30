@@ -1,0 +1,11 @@
+# No mandar al contexto de build lo pesado/irrelevante.
+target/
+models/
+runtime/
+.git/
+docs/
+scratchpad/
+*.md
+!README.md
+.github/
+tests/fixtures/*.wav
