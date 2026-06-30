@@ -1,0 +1,39 @@
+[package]
+name = "rosetta-asr"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+ort = { workspace = true }
+rosetta-core = { workspace = true }
+rosetta-accel = { workspace = true }
+ndarray = "0.17"
+# Bloque D: motor Whisper (mel-frontend + tokenizer byte-level + decode loop).
+# realfft (FFT real, Rust puro) para el STFT; serde_json para config/vocab.
+realfft = "3"
+# E4: encoder BPE de Whisper (regex de pre-tokenización GPT-2 con lookahead).
+# fancy-regex es Rust puro (no compila C, a diferencia de `tokenizers`/onig).
+fancy-regex = "0.14"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+# F2: motor Parakeet TDT (encoder + decoder_joint + nemo128 preproc) sobre ort.
+
+[dev-dependencies]
+rosetta-audio = { workspace = true }
+rosetta-accel = { workspace = true }
+hound = "3.5.1"
+
+# Solo para el probe de diagnóstico del crash QNN (tests/qnn_crash_stack.rs):
+# captura el call stack del stack-overflow vía vectored exception handler para
+# identificar el módulo que recursa. Bindings Rust puro (raw-dylib), sin C.
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Kernel",
+    "Win32_System_Threading",
+    "Win32_System_LibraryLoader",
+] }

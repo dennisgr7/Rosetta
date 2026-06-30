@@ -1,0 +1,81 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+# `xtask` es solo-tooling (guardia sin-C): se queda FUERA del set por defecto para
+# que `cargo build`/`cargo test` sin `-p`/`--workspace` no lo compilen. Se invoca
+# explícito vía `cargo xtask …` (alias en .cargo/config.toml) o `cargo run -p xtask`.
+default-members = [
+    "crates/rosetta-cli",
+    "crates/rosetta-core",
+    "crates/rosetta-accel",
+    "crates/rosetta-audio",
+    "crates/rosetta-asr",
+    "crates/rosetta-diarize",
+    "crates/rosetta-models",
+    "crates/rosetta-pipeline",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+authors = ["chese <cheseydennis@gmail.com>"]
+repository = "https://github.com/dennisgr7/Rosetta"
+description = "Rosetta: transcripción de audio/vídeo on-device con NPU (NPU→GPU→CPU), multiplataforma"
+
+[workspace.dependencies]
+# crates internos
+rosetta-core = { path = "crates/rosetta-core" }
+rosetta-accel = { path = "crates/rosetta-accel" }
+rosetta-audio = { path = "crates/rosetta-audio" }
+rosetta-asr = { path = "crates/rosetta-asr" }
+rosetta-diarize = { path = "crates/rosetta-diarize" }
+rosetta-models = { path = "crates/rosetta-models" }
+rosetta-pipeline = { path = "crates/rosetta-pipeline" }
+# externos
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Runtime de inferencia ONNX. Bloque BASE común a los 4 crates que usan ort.
+# `default-features = false` SOLO puede fijarse aquí (en la entrada del workspace);
+# las entradas que heredan con `{ workspace = true }` lo toman de aquí y NO pueden
+# re-declararlo. Las features son aditivas: cada crate suma las suyas por target
+# (p. ej. accel añade `tracing`, `qnn`/`directml`, `coreml`, `openvino`). Con
+# `load-dynamic` ninguna feature de EP compila C/C++ (solo bindings Rust).
+ort = { version = "2.0.0-rc.12", default-features = false, features = ["std", "ndarray", "api-24", "load-dynamic"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# Empaquetado y distribución con `dist` (cargo-dist). Genera instaladores
+# multiplataforma + auto-update desde un tag `v*`. La dylib de ONNX Runtime viaja
+# como sidecar JUNTO al binario (load-dynamic la resuelve ahí); el workflow de
+# release la descarga por target. `allow-dirty = ["ci"]` permite añadir a mano el
+# paso de descarga de la dylib en el release.yml generado.
+[workspace.metadata.dist]
+cargo-dist-version = "0.32.0"
+ci = "github"
+installers = ["shell", "powershell", "npm", "homebrew"]
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "aarch64-pc-windows-msvc",
+]
+install-updater = true
+allow-dirty = ["ci"]
+
+# Perfil que `dist` usa para los binarios del release (release + máx. optimización).
+[profile.dist]
+inherits = "release"
+lto = "thin"

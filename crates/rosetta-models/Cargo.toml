@@ -1,0 +1,29 @@
+[package]
+name = "rosetta-models"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+bzip2-rs = "0.1.2" # decode-only, Rust puro (sin C). Alternativa: bzip2 0.6 + libbz2-rs-sys.
+directories = "6.0.0"
+rosetta-core = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+sha2 = "0.11.0"
+tar = "0.4.46"
+thiserror.workspace = true
+toml = "1.1.2"
+tracing.workspace = true
+ureq = { version = "3.3.0", default-features = false, features = ["gzip"] }
+
+# TLS por plataforma: SChannel en Windows (sin C, respeta la regla no-C de la
+# build de Windows); rustls en el resto (Rust puro en el grafo, sin depender de
+# `libssl-dev`/openssl-sys; en Linux rustls compila C vía ring/aws-lc, pero ahí
+# la regla no aplica).
+[target.'cfg(windows)'.dependencies]
+ureq = { version = "3.3.0", default-features = false, features = ["native-tls"] }
+
+[target.'cfg(not(windows))'.dependencies]
+ureq = { version = "3.3.0", default-features = false, features = ["rustls"] }

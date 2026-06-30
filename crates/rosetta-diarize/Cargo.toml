@@ -1,0 +1,20 @@
+[package]
+name = "rosetta-diarize"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+rosetta-core = { workspace = true }
+rosetta-accel = { workspace = true }
+rosetta-audio = { workspace = true }
+anyhow = { workspace = true }
+ndarray = "0.17"
+kaldi-native-fbank = "0.1"
+kodama = "0.3"
+tracing.workspace = true
+ort = { workspace = true }
+
+[dev-dependencies]
+rosetta-models = { workspace = true }

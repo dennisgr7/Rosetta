@@ -1,0 +1,29 @@
+/target
+**/*.rs.bk
+*.pdb
+
+# Modelos descargados / runtimes / cachés locales
+/models/
+/runtime/
+*.onnx
+*.ort
+*.bin
+*.dll
+*.dylib
+*.so
+
+# Audio de pruebas pesado (versionar sólo fixtures pequeños a mano con git add -f)
+/tests/fixtures/*.wav
+/tests/fixtures/*.mp4
+/tests/fixtures/*.mp3
+# salidas de transcripción generadas en pruebas (no versionar)
+/tests/fixtures/*.md
+/tests/fixtures/*.srt
+/tests/fixtures/*.vtt
+/tests/fixtures/*.json
+
+# SO / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

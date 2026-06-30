@@ -1,0 +1,50 @@
+[package]
+name = "rosetta-accel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+rosetta-core = { workspace = true }
+# sysinfo se mantiene en 0.38.x a propósito: 0.39+ sube el MSRV por encima de
+# 1.88 (el MSRV del workspace), así que no se actualiza hasta subir el MSRV.
+sysinfo = "0.38.4"
+tracing = { workspace = true }
+serde_json = { workspace = true }
+# sha2 puro-Rust (sin C): ancla de integridad de la caché de grafo opt#4
+# (seguridad-2). Solo se usa con `ROSETTA_GRAPH_CACHE` activo. Misma versión que
+# rosetta-models (no compila C).
+sha2 = "0.11.0"
+# Base multiplataforma (hereda el bloque común del workspace: std/ndarray/api-24/
+# load-dynamic) + `tracing` por encima. Las features de EP se añaden por target
+# abajo: `qnn`/`directml` son Windows-only (no compilan en Linux/macOS) y `coreml`
+# es macOS. Con `load-dynamic` ninguna de ellas compila C/C++ (solo bindings Rust);
+# la disponibilidad real se resuelve en runtime con la dylib cargada.
+ort = { workspace = true, features = [
+    "tracing", # enruta los logs internos de ONNX Runtime por `tracing` (telemetría)
+] }
+
+[target.'cfg(windows)'.dependencies]
+windows-registry = "0.6.1"
+ort = { workspace = true, features = ["qnn", "directml"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+ort = { workspace = true, features = ["coreml"] }
+
+# OpenVINO (Intel NPU/GPU) en Windows y Linux x86_64. La dylib con OpenVINO EP es
+# un build aparte (no la oficial); el EP solo está "disponible" en runtime si esa
+# dylib se carga. Con load-dynamic la feature no compila C.
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
+ort = { workspace = true, features = ["openvino"] }
+
+# CUDA / TensorRT (GPU discreta NVIDIA). arq-1 SCAFFOLD OPT-IN: gateado a x86_64
+# Windows/Linux (NO aarch64 → cero peso muerto en Snapdragon). En ort-sys las
+# features `cuda`/`tensorrt` son flags vacíos (`= []`): con `load-dynamic` solo
+# habilitan bindings Rust, NO compilan C; la dylib CUDA se carga aparte en runtime
+# y `ep_available()` filtra si no está. El % de nodos en GPU NO está validado en HW.
+[target.'cfg(all(any(target_os = "windows", target_os = "linux"), target_arch = "x86_64"))'.dependencies]
+ort = { workspace = true, features = ["cuda", "tensorrt"] }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+raw-cpuid = "11"

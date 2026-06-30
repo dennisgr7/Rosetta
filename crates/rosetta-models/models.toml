@@ -1,0 +1,117 @@
+# Catálogo de modelos de Rosetta.
+#
+# Cada [[model]] agrupa uno o más [[model.file]]. Un archivo se obtiene por:
+#   - `url`                       -> descarga directa, o
+#   - `archive_url` + `archive_member` -> descarga un .tar.bz2 y extrae un miembro.
+# `sha256` es OBLIGATORIO: el loader rechaza cualquier archivo del catálogo sin él
+# y verifica la integridad tras descargar (re-descarga si no casa). Esto ancla la
+# integridad aunque el upstream sea una rama mutable (p. ej. Silero en `master`).
+# Todos los modelos son no-gated y de licencia permisiva; los .onnx son 16 kHz.
+
+# Modelo ASR principal (Parakeet TDT 0.6B v3, export ONNX int8, 26 idiomas).
+# Cuatro archivos: preprocesador nemo128 + encoder + decoder_joint + vocabulario.
+# El loader (rosetta-asr) prefiere la variante .int8.* que registramos aquí.
+[[model]]
+id = "parakeet-tdt-0.6b-v3"
+kind = "asr"
+license = "CC-BY-4.0"
+[[model.file]]
+name = "nemo128.onnx"
+url = "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/nemo128.onnx"
+sha256 = "a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f"
+[[model.file]]
+name = "encoder-model.int8.onnx"
+url = "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/encoder-model.int8.onnx"
+sha256 = "6139d2fa7e1b086097b277c7149725edbab89cc7c7ae64b23c741be4055aff09"
+[[model.file]]
+name = "decoder_joint-model.int8.onnx"
+url = "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/decoder_joint-model.int8.onnx"
+sha256 = "eea7483ee3d1a30375daedc8ed83e3960c91b098812127a0d99d1c8977667a70"
+[[model.file]]
+name = "vocab.txt"
+url = "https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx/resolve/main/vocab.txt"
+sha256 = "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
+
+# Motor ASR por defecto (Whisper large-v3-turbo, export ONNX int8 single-file de
+# onnx-community, MIT, 99 idiomas). Cinco archivos: encoder + decoder MERGED int8
+# (un solo .onnx, sin el sidecar .onnx_data de 2.55 GB del fp32) + vocab/config/
+# generation_config (dims y tokens; leídos por serde en WhisperEngine). Los nombres
+# locales son planos aunque los .onnx vivan en onnx/ en el repo upstream.
+[[model]]
+id = "whisper-large-v3-turbo"
+kind = "asr"
+license = "MIT"
+[[model.file]]
+name = "encoder_model_int8.onnx"
+url = "https://huggingface.co/onnx-community/whisper-large-v3-turbo/resolve/main/onnx/encoder_model_int8.onnx"
+sha256 = "e44c0d5cfcc6ad283011602a738fa28dfa1ad7f7540c9503205479072a9cc1ef"
+[[model.file]]
+name = "decoder_model_merged_int8.onnx"
+url = "https://huggingface.co/onnx-community/whisper-large-v3-turbo/resolve/main/onnx/decoder_model_merged_int8.onnx"
+sha256 = "61481bd3be3a445d5a4b9070e8f8b2c6cc4fbbbbdc9f0e7ed048a132b8b84e0d"
+[[model.file]]
+name = "vocab.json"
+url = "https://huggingface.co/onnx-community/whisper-large-v3-turbo/resolve/main/vocab.json"
+sha256 = "e2aa043ef015641d363d8288e7c241c85e36a5c761fb303598e0710233344387"
+[[model.file]]
+name = "config.json"
+url = "https://huggingface.co/onnx-community/whisper-large-v3-turbo/resolve/main/config.json"
+sha256 = "35cd83669f75bc2867f3b3a4461850392d5e308cd6ea951c3700539883c28df1"
+[[model.file]]
+name = "generation_config.json"
+url = "https://huggingface.co/onnx-community/whisper-large-v3-turbo/resolve/main/generation_config.json"
+sha256 = "16f95291d2f47c944d3c2b19390bba7965666555c1ea2a0bdc850d1fab45612f"
+[[model.file]]
+# merges BPE (E4): necesarias para CODIFICAR texto→tokens (init-prompt / prev-text).
+name = "merges.txt"
+url = "https://huggingface.co/onnx-community/whisper-large-v3-turbo/resolve/main/merges.txt"
+sha256 = "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6"
+
+[[model]]
+id = "silero-vad"
+kind = "vad"
+license = "MIT"
+[[model.file]]
+# Pin a un commit inmutable de master (seguridad-6): el contenido es idéntico al
+# que servía `master`, así que el sha256 de abajo NO cambia. Evita que un push a la
+# rama mutable altere el binario que descargamos sin que nos enteremos.
+name = "silero_vad.onnx"
+url = "https://raw.githubusercontent.com/snakers4/silero-vad/dbacf536adadf42210f37ae50fbaf75f6235b3cf/src/silero_vad/data/silero_vad.onnx"
+sha256 = "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3"
+
+[[model]]
+id = "dpdfnet2"
+kind = "denoise"
+license = "Apache-2.0"
+[[model.file]]
+name = "dpdfnet2.onnx"
+url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/dpdfnet2.onnx"
+sha256 = "ce35d6025fc71df0ef10d1540e1b7916837bbfe5f6896deb744508d2cad487a9"
+
+[[model]]
+id = "gtcrn-simple"
+kind = "denoise"
+license = "MIT"
+[[model.file]]
+name = "gtcrn_simple.onnx"
+url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/gtcrn_simple.onnx"
+sha256 = "e77603ac0c23dac3227dd2d7135b3a585cbee2679048aecfa886657d3ae1b534"
+
+[[model]]
+id = "pyannote-segmentation-3.0"
+kind = "diar-seg"
+license = "MIT"
+[[model.file]]
+name = "model.onnx"
+archive_url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2"
+archive_member = "sherpa-onnx-pyannote-segmentation-3-0/model.onnx"
+sha256 = "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079"
+
+[[model]]
+id = "campplus-sv-zh-en"
+kind = "diar-emb"
+license = "Apache-2.0"
+[[model.file]]
+name = "campplus.onnx"
+url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
+sha256 = "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"

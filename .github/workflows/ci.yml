@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Auditoría programada (seguridad-3): re-evalúa advisories cada lunes 07:00 UTC
+  # sobre el Cargo.lock commiteado, para cazar CVEs nuevos sin esperar a un push.
+  schedule:
+    - cron: "0 7 * * 1"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-test:
+    name: build-test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # cobertura-4: ahora se valida también ARM64 en la nube.
+        #  - ubuntu-24.04-arm: Linux aarch64 (runner GA y gratis en repos públicos).
+        #  - macos-latest: ya es Apple Silicon (arm64).
+        #  - Windows ARM64 se cubre con un job aparte de cross-clippy (no hay runner
+        #    de ejecución fiable; el dev valida la build nativa en su Snapdragon).
+        # La nube valida compatibilidad Linux x64/arm64, macOS arm64 y Windows x64 en CPU.
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # ONNX Runtime (load-dynamic, CPU) + ffmpeg por SO/arquitectura. Windows valida
+      # la build en la nube (x64) y la dylib DirectML se prueba en local (Snapdragon).
+      - name: ONNX Runtime + ffmpeg (Linux x64)
+        if: runner.os == 'Linux' && runner.arch == 'X64'
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          curl -fL -o ort.tgz https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-linux-x64-1.24.4.tgz
+          # Verificar integridad del tarball (cobertura-3): sha256 del asset exacto de v1.24.4.
+          echo "3a211fbea252c1e66290658f1b735b772056149f28321e71c308942cdb54b747  ort.tgz" | sha256sum -c -
+          tar xf ort.tgz
+          mkdir -p runtime/linux-x64
+          cp -a onnxruntime-linux-x64-1.24.4/lib/libonnxruntime.so* runtime/linux-x64/
+          echo "ORT_DYLIB_PATH=$PWD/runtime/linux-x64/libonnxruntime.so" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$PWD/runtime/linux-x64" >> "$GITHUB_ENV"
+      - name: ONNX Runtime + ffmpeg (Linux ARM64)
+        if: runner.os == 'Linux' && runner.arch == 'ARM64'
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          curl -fL -o ort.tgz https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-linux-aarch64-1.24.4.tgz
+          # Verificar integridad del tarball (cobertura-4): sha256 del asset exacto de v1.24.4.
+          echo "866109a9248d057671a039b9d725be4bd86888e3754140e6701ec621be9d4d7e  ort.tgz" | sha256sum -c -
+          tar xf ort.tgz
+          mkdir -p runtime/linux-aarch64
+          cp -a onnxruntime-linux-aarch64-1.24.4/lib/libonnxruntime.so* runtime/linux-aarch64/
+          echo "ORT_DYLIB_PATH=$PWD/runtime/linux-aarch64/libonnxruntime.so" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$PWD/runtime/linux-aarch64" >> "$GITHUB_ENV"
+      - name: ONNX Runtime + ffmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ffmpeg
+          curl -fL -o ort.tgz https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-osx-arm64-1.24.4.tgz
+          # Verificar integridad del tarball (cobertura-3): sha256 del asset exacto de v1.24.4.
+          echo "93787795f47e1eee369182e43ed51b9e5da0878ab0346aecf4258979b8bba989  ort.tgz" | shasum -a 256 -c -
+          tar xf ort.tgz
+          mkdir -p runtime/osx-arm64
+          cp -a onnxruntime-osx-arm64-1.24.4/lib/libonnxruntime*.dylib runtime/osx-arm64/
+          echo "ORT_DYLIB_PATH=$PWD/runtime/osx-arm64/libonnxruntime.dylib" >> "$GITHUB_ENV"
+          echo "DYLD_LIBRARY_PATH=$PWD/runtime/osx-arm64" >> "$GITHUB_ENV"
+      - name: ONNX Runtime (Windows x64)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          curl -fL -o ort.zip https://github.com/microsoft/onnxruntime/releases/download/v1.24.4/onnxruntime-win-x64-1.24.4.zip
+          # Verificar integridad del zip (cobertura-4): sha256 del asset exacto de v1.24.4.
+          # `sha256sum` viene con git-bash en los runners windows (shell: bash).
+          echo "d2319fddfb6ea4db99ccc4b60c85c517bcd855721f5daa6a06d40d7cb2ee2357  ort.zip" | sha256sum -c -
+          unzip -q ort.zip
+          mkdir -p runtime/win-x64
+          cp -a onnxruntime-win-x64-1.24.4/lib/onnxruntime.dll runtime/win-x64/
+          echo "ORT_DYLIB_PATH=$PWD/runtime/win-x64/onnxruntime.dll" >> "$GITHUB_ENV"
+      - name: Build
+        run: cargo build --workspace --verbose
+      - name: Test
+        run: cargo test --workspace --verbose
+      - name: Format check
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --workspace -- -D warnings
+      # Smoke de carga de ONNX Runtime por load-dynamic (no necesita modelos):
+      # `doctor` carga la dylib y enumera la cascada de EPs en cada SO.
+      # cobertura-4: ahora también en Windows (la dylib x64 se asegura arriba).
+      - name: Smoke (carga ONNX Runtime)
+        run: cargo run -p rosetta-cli -- doctor
+
+  no-c:
+    name: regla sin-C (build de Windows)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # `cargo tree --target <triple>` resuelve el grafo sin necesitar el toolchain
+      # del target, así que corre en Linux y valida que la build de Windows no
+      # arrastre ningún crate que compile C/C++ (la dev ARM64 no tiene MSVC/clang).
+      # F8: guard 100% Rust vía xtask del workspace (sustituye al bash heredado).
+      - name: No-C guard (grafo por-target de Windows)
+        run: cargo xtask check-no-c
+
+  # cobertura-4: cross-clippy para Windows ARM64. No ejecuta (no hay runner fiable de
+  # ejecución arm64-windows), pero VALIDA que el workspace compila/lint-ea para ese
+  # target — la plataforma nativa del dev (Snapdragon X). El toolchain del target se
+  # añade con rustup; load-dynamic evita necesitar la dylib de ORT para clippy.
+  win-arm64-clippy:
+    name: cross-clippy (Windows ARM64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+      - name: Clippy (aarch64-pc-windows-msvc)
+        run: cargo clippy --workspace --target aarch64-pc-windows-msvc -- -D warnings
+
+  # Advisories aislado (seguridad-3): corre en push/PR Y en el cron semanal, sobre el
+  # Cargo.lock commiteado. Separado del resto para que la auditoría programada solo
+  # mire CVEs (licenses/bans/sources son ruido en un cron de seguridad).
+  advisories:
+    name: cargo-deny (advisories)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories
+
+  deny:
+    name: cargo-deny (licencias, bans, fuentes)
+    # licenses/bans/sources solo en push/PR; el cron semanal lo cubre `advisories`.
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check licenses bans sources

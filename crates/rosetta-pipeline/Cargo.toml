@@ -1,0 +1,12 @@
+[package]
+name = "rosetta-pipeline"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+rosetta-core = { workspace = true }
+rosetta-asr = { workspace = true }
+rosetta-audio = { workspace = true }
+tracing = { workspace = true }

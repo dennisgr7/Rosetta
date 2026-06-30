@@ -1,0 +1,13 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+# `publish = false`: xtask es tooling interno del workspace, no se publica.
+publish = false
+
+# Sin dependencias a propósito: solo `std`. Así el binario de tooling NO arrastra
+# ningún crate que pudiera compilar C ni infla el árbol de dependencias del
+# workspace. Toda la lógica usa `std::process::Command` para invocar `cargo tree`.
+[dependencies]

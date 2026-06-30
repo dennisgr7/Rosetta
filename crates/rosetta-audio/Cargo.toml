@@ -1,0 +1,21 @@
+[package]
+name = "rosetta-audio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+ffmpeg-sidecar = { version = "2.5.2", default-features = false }
+rosetta-core = { workspace = true }
+rosetta-accel = { workspace = true }
+rubato = "3"
+audioadapter-buffers = "3"
+symphonia = { version = "0.6", features = ["all"] }
+tracing.workspace = true
+ndarray = "0.17"
+realfft = "3"
+ort = { workspace = true }
+
+[dev-dependencies]
+hound = "3.5.1"

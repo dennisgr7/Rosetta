@@ -1,0 +1,11 @@
+# Normalizar finales de línea a LF en el repositorio (multiplataforma).
+* text=auto eol=lf
+
+# Binarios: no tocar.
+*.png binary
+*.jpg binary
+*.onnx binary
+*.bin binary
+*.wav binary
+*.mp4 binary
+*.mp3 binary

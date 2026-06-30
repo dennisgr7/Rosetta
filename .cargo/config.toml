@@ -1,0 +1,22 @@
+# Configuración de cargo para Rosetta.
+#
+# ORT_DYLIB_PATH: ruta a la librería de ONNX Runtime para el modo `load-dynamic`
+# del crate `ort`. Se define relativa a la raíz del workspace (donde está este
+# config) y NO se fuerza (force = false): en CI o en otra máquina, una variable
+# de entorno ORT_DYLIB_PATH ya presente tiene prioridad.
+#
+# La DLL vive en `runtime/<subdir>` (no versionada; ver .gitignore). Se apunta a
+# la build DirectML (`runtime/win-arm64-dml/onnxruntime.dll`) porque `DirectML.dll`
+# vive en esa MISMA carpeta y el loader de Windows la encuentra junto a la dll de
+# onnxruntime; apuntar a la copia de `runtime/` raíz dejaba DirectML caído (sin
+# `DirectML.dll` adyacente) y la inferencia caía a CPU en silencio.
+# En otras plataformas exporta ORT_DYLIB_PATH manualmente (force = false: tu env
+# tiene prioridad) o deja que `ensure_ort_dylib` busque en runtime/<subdir>.
+
+[env]
+ORT_DYLIB_PATH = { value = "runtime/win-arm64-dml/onnxruntime.dll", relative = true, force = false }
+
+# Alias de tooling: `cargo xtask check-no-c` corre la guardia sin-C por-target
+# (guardia sin-C por-target, en Rust puro). `--` separa los args del subcomando.
+[alias]
+xtask = "run -p xtask --"
