@@ -4,7 +4,7 @@
 sin telemetría — tu audio nunca sale de tu máquina.
 
 [![CI](https://github.com/dennisgr7/Rosetta/actions/workflows/ci.yml/badge.svg)](https://github.com/dennisgr7/Rosetta/actions/workflows/ci.yml)
-&nbsp;·&nbsp; Licencia: MIT OR Apache-2.0 &nbsp;·&nbsp; Windows · Linux · macOS (x86-64 y ARM64)
+&nbsp;·&nbsp; Licencia: MIT OR Apache-2.0 &nbsp;·&nbsp; Windows · Linux (x86-64 y ARM64) · macOS (Apple Silicon)
 
 🇬🇧 [Read me in English](README.md)
 
@@ -128,8 +128,7 @@ volumen en `/models` para que los modelos persistan entre ejecuciones.
 Requiere Rust ≥ 1.88. Rosetta carga ONNX Runtime de forma dinámica (`load-dynamic`); **en el primer
 uso descarga el runtime oficial de tu plataforma** (verificado por sha256) a la caché si no está ya
 disponible — no tienes que aportarlo. Puedes forzar con `ORT_DYLIB_PATH` o dejar la librería en
-`runtime/<plataforma>/`. En Windows esto mantiene el build **sin C**. (macOS x86_64/Intel no tiene
-build oficial; ahí define `ORT_DYLIB_PATH`.)
+`runtime/<plataforma>/`. En Windows esto mantiene el build **sin C**. macOS es solo Apple Silicon.
 
 ```sh
 git clone https://github.com/dennisgr7/Rosetta && cd Rosetta

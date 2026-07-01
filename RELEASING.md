@@ -28,8 +28,8 @@ shared library (next to the executable, in `runtime/<platform>/`, or via `ORT_DY
 the same on-demand mechanism used for models (`rosetta_models::ensure_ort_runtime`). So a
 `dist`-installed binary works out of the box; **no dylib sidecar is bundled in the release archive.**
 
-Covered targets: Windows x64/arm64, Linux x64/arm64, macOS arm64. **Exception:** macOS x86_64 (Intel)
-has no official ONNX Runtime release for v1.24.4 — set `ORT_DYLIB_PATH` manually there.
+Covered targets: Windows x64/arm64, Linux x64/arm64, macOS arm64 (Apple Silicon). **Intel Macs are
+not supported** — Apple ships ARM only since 2020, and there is no official ONNX Runtime build for macOS x86_64.
 
 (The downloaded runtime is the CPU build, which is the sensible default everywhere — on Snapdragon
 DirectML is slower than CPU anyway. For a discrete GPU, provide a GPU-enabled dylib via `ORT_DYLIB_PATH`.)

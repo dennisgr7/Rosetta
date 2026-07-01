@@ -64,9 +64,10 @@ strip = true
 cargo-dist-version = "0.32.0"
 ci = "github"
 installers = ["shell", "powershell", "npm", "homebrew"]
+# macOS solo Apple Silicon (ARM): Apple no vende Intel desde 2020 y ONNX Runtime
+# no publica build oficial para macOS x86_64.
 targets = [
     "aarch64-apple-darwin",
-    "x86_64-apple-darwin",
     "x86_64-unknown-linux-gnu",
     "aarch64-unknown-linux-gnu",
     "x86_64-pc-windows-msvc",
